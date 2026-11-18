@@ -9,6 +9,7 @@
 | M1 打卡采信 | 查看并复算打卡采信 | `/api/m1_ingest` | `app/modules/m1_ingest/reader.py` | `tests/test_ingest.py` |
 | M2 班次日历 | 查看并复算班次日历 | `/api/m2_mapping` | `app/modules/m2_mapping/rules.py` | `tests/test_mapping.py` |
 | M3 跨夜配对 | 查看并复算跨夜配对 | `/api/m3_versions` | `app/modules/m3_versions/rules.py` | `tests/test_versions.py` |
+| M3b 支援交接 | 查看并复算支援交接采信 | `/api/m3b_handovers` | `app/modules/m3b_handovers/rules.py` | `tests/test_handovers.py` |
 | M4 缺卡复核 | 查看并复算缺卡复核 | `/api/m4_segments` | `app/modules/m4_segments/rules.py` | `tests/test_segments.py` |
 | M5 工时切段 | 查看并复算工时切段 | `/api/m5_calculate` | `app/modules/m5_calculate/rules.py` | `tests/test_calculate.py` |
 | M6 薪资对账 | 查看并复算薪资对账 | `/api/m6_reconcile` | `app/modules/m6_reconcile/compare.py` | `tests/test_reconcile.py` |
@@ -31,10 +32,14 @@
 | TRAP-26 | 旧版本复核 | 覆盖新结论 | 事务条件更新 | `app/store.py` | `tests/test_archive.py::test_stale_review` |
 | TRAP-23 | 休息与跨夜端点 | 重复或漏计 | 半开区间切片 | `app/modules/m4_segments/rules.py` | `tests/test_segments.py::test_break_removed` |
 | TRAP-19 | 假日与周末重叠 | 费率相加 | 假日优先 | `app/modules/m5_calculate/rules.py` | `tests/test_calculate.py::test_holiday_overrides_rest` |
+| TRAP-30 | 跨夜支援整班归属 | 接收产线少承担支援工时 | 按交接时刻切责任时段 | `app/modules/m4_segments/rules.py` | `tests/test_handovers.py::test_handover_split_at_transfer_instant` |
+| TRAP-31 | 交接落在休息区间 | 休息时段也计给接收班组 | 休息先扣除，复工后换组 | `app/modules/m4_segments/rules.py` | `tests/test_handovers.py::test_handover_during_break_charge_starts_on_resume` |
+| TRAP-32 | 晚到交接改金额 | 覆盖旧成本或重复累计 | 交接哈希入身份，新批次封存旧批 | `app/manifest.py` | `tests/test_handovers.py::test_changed_handover_changes_run_id` |
+| TRAP-33 | 班组金额漂移 | 分段与汇总对不上 | 班组分钟/金额双守恒 | `app/modules/m6_reconcile/compare.py` | `tests/test_handovers.py::test_team_costs_sum_to_total` |
 
 ## 对账规则
 
-输入行数=采纳+隔离+空行+重复表头+完全重复；业务总数与计算证据独立求和。隔离行保留来源行、ID、原因码与原值。
+输入行数=采纳+隔离+空行+重复表头+完全重复；业务总数与计算证据独立求和。隔离行保留来源行、ID、原因码与原值。交接源执行同一套行数守恒，并额外要求班组成本汇总与计薪总额分钟、金额双守恒。
 
 ## 已知不覆盖
 

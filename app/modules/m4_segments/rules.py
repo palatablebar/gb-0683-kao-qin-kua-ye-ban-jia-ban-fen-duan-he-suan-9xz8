@@ -1,6 +1,15 @@
 from datetime import datetime,timedelta
+from app.config import DEFAULT_TEAM
 from app.modules.m3_versions.rules import schedule,ZONE
 from app.errors import DomainError
+
+def team_at(moment, handovers_local):
+    """责任班组：交接时刻（半开）之后由接收班组承担；之前归起始班组。"""
+    team=DEFAULT_TEAM;via=None
+    for at,line,to_team in handovers_local:
+        if at<=moment:team=to_team;via=line
+        else:break
+    return team,via
 
 def split_shift(shift):
     if shift['in'] is None or shift['out'] is None:raise DomainError('MISSING','班次缺少进出打卡')
@@ -9,15 +18,23 @@ def split_shift(shift):
     if start>=end or end-start>timedelta(hours=18):raise DomainError('RANGE','打卡时长超出18小时')
     if start<planned_start-timedelta(hours=6) or end>planned_end+timedelta(hours=6):raise DomainError('RANGE','打卡超出班次范围')
     if start.second or end.second or start.microsecond or end.microsecond:raise DomainError('RANGE','打卡精度必须为整分钟')
+    handovers=sorted(shift.get('handovers',[]),key=lambda h:h['at'])
+    handovers_local=[(datetime.fromisoformat(h['at']).astimezone(ZONE),h['line'],h['to_team']) for h in handovers]
     boundaries={start,end}
     for d in (bs,be):
         if start<d<end:boundaries.add(d)
     midnight=start.replace(hour=0,minute=0,second=0)+timedelta(days=1)
     while midnight<end:boundaries.add(midnight);midnight+=timedelta(days=1)
+    for hp,_,_ in handovers_local:
+        if start<hp<end:boundaries.add(hp)
     points=sorted(boundaries);segments=[]
     for left,right in zip(points,points[1:]):
         if bs<=left<be:continue
-        segments.append({'id':shift['id'],'employee':shift['employee'],'shift_day':shift['day'],'calendar_day':left.date().isoformat(),'start':left.isoformat(),'end':right.isoformat(),'minutes':int((right-left).total_seconds()//60),'rate':str(a['hourly_rate']),'line':a['_line']})
+        team,via=team_at(left,handovers_local)
+        segments.append({'id':shift['id'],'employee':shift['employee'],'shift_day':shift['day'],
+            'calendar_day':left.date().isoformat(),'start':left.isoformat(),'end':right.isoformat(),
+            'minutes':int((right-left).total_seconds()//60),'rate':str(a['hourly_rate']),
+            'team':team,'via_handover_line':via,'line':a['_line']})
     return segments
 
 def apply(state):

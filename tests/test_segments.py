@@ -4,12 +4,12 @@ from app.modules.m4_segments.rules import split_shift,apply
 from app.errors import DomainError
 
 def test_real_night_seven_hours(raw):
-    s=run(raw,{},4);assert sum(r['minutes'] for r in s['segments'] if r['employee']=='E001')==420
+    s=run(raw,{'handover':''},5);assert sum(r['minutes'] for r in s['segments'] if r['employee']=='E001')==420
 def test_actual_calendar_dates(raw):
-    s=run(raw,{},4);assert {r['calendar_day'] for r in s['segments'] if r['employee']=='E001'}=={'2026-10-01','2026-10-02'}
+    s=run(raw,{'handover':''},5);assert {r['calendar_day'] for r in s['segments'] if r['employee']=='E001'}=={'2026-10-01','2026-10-02'}
 def test_break_removed(raw):
     # TRAP-23
-    s=run(raw,{},4);assert [r['minutes'] for r in s['segments'] if r['employee']=='E001']==[120,120,180]
+    s=run(raw,{'handover':''},5);assert [r['minutes'] for r in s['segments'] if r['employee']=='E001']==[120,120,180]
 def test_missing_out_rejected(raw):
     p=run(raw,{},3)['shifts'][0];p['out']=None
     with pytest.raises(DomainError) as e:split_shift(p)

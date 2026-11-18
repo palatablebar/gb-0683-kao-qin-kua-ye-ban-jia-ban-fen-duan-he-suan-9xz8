@@ -30,3 +30,37 @@ def test_reselect_existing_run_updates_visible_batch(client):
 
 def test_invalid_csv_type_rejected(client):
     assert client.post('/api/runs',json={'csv':123}).status_code==422
+
+def test_handover_submission_splits_team_cost(client):
+    handover=('h_id,employee,shift_day,version,at,to_team,note\n'
+        'H1,E001,2026-10-01,1,2026-10-02T00:30:00+08:00,LINE-B,x\n')
+    r=client.post('/api/runs',json={'sample':'dirty.csv','handover':handover})
+    assert r.status_code==200
+    s=r.get_json();teams={t['team']:t for t in s['team_totals']}
+    assert 'LINE-B' in teams and s['business']['team_amount']==s['business']['total']
+
+def test_handover_change_invalidates_old_run_without_double_count(client):
+    h1=('h_id,employee,shift_day,version,at,to_team,note\n'
+        'H1,E001,2026-10-01,1,2026-10-02T00:30:00+08:00,LINE-B,x\n')
+    h2=h1.replace('00:30','01:00')
+    a=client.post('/api/runs',json={'sample':'dirty.csv','handover':h1}).get_json()
+    b=client.post('/api/runs',json={'sample':'dirty.csv','handover':h2}).get_json()
+    assert a['run_id']!=b['run_id']
+    # 再跑一次 h1：身份复用旧批次，库中不新增、不累计
+    again=client.post('/api/runs',json={'sample':'dirty.csv','handover':h1}).get_json()
+    ids=[r['id'] for r in client.get('/api/runs').get_json()]
+    assert again['run_id']==a['run_id'] and ids.count(a['run_id'])==1
+
+def test_no_handover_run_is_separate_identity(client):
+    a=client.post('/api/runs',json={'sample':'dirty.csv'}).get_json()
+    b=client.post('/api/runs',json={'sample':'dirty.csv','handover':''}).get_json()
+    assert a['run_id']!=b['run_id']
+
+def test_handover_pages_render(client):
+    from app.config import MODULES
+    for mod in ('m3b_handovers','m4_segments','m5_calculate','m6_reconcile'):
+        assert client.get('/'+mod).status_code==200
+    assert len(MODULES)==8
+
+def test_bad_handover_type_rejected(client):
+    assert client.post('/api/runs',json={'sample':'dirty.csv','handover':123}).status_code==422

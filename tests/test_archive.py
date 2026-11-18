@@ -8,7 +8,12 @@ import pytest
 def test_export_rows(state):
     rows=list(csv.reader(io.StringIO(bundle(state).lstrip('\ufeff'))));assert rows[0][0]=='记录类型' and rows[1][0]=='运行清单'
 def test_export_quarantine(state):
-    assert bundle(state).count('隔离')==len(state['quarantine'])
+    rows=list(csv.reader(io.StringIO(bundle(state).lstrip('﻿'))))
+    kinds=[r[0] for r in rows]
+    assert kinds.count('隔离')==len(state['quarantine'])
+    assert kinds.count('交接隔离')==len(state.get('h_quarantine',[]))
+    assert kinds.count('交接')==len(state.get('handovers',[]))
+    assert kinds.count('班组成本')==len(state.get('team_totals',[]))
 def test_checksum_stable(state):
     assert checksum(state)==state['archive']['sha256'] and len(checksum(state))==64
 def test_archive_ready(state):
